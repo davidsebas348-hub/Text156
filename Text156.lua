@@ -1,11 +1,10 @@
 -- ======================
--- ESP SOLO MURDER (TOGGLE POR EJECUCIÓN)
+-- ESP SOLO MURDER (OPTIMIZADO Y CORREGIDO)
 -- ======================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 -- ======================
@@ -14,51 +13,33 @@ local LocalPlayer = Players.LocalPlayer
 _G.MurderESP = not _G.MurderESP
 
 -- ======================
--- FUNCIÓN LIMPIAR TODO
+-- LIMPIAR ESP
 -- ======================
-local function ClearESP()
-	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr.Character then
-			local h = plr.Character:FindFirstChild("MurderESP")
-			if h then h:Destroy() end
+local function clearESP(player)
+	if player.Character then
+		local h = player.Character:FindFirstChild("MurderESP")
+		if h then h:Destroy() end
 
-			local g = plr.Character:FindFirstChild("MurderLabel")
-			if g then g:Destroy() end
-		end
+		local g = player.Character:FindFirstChild("MurderLabel")
+		if g then g:Destroy() end
 	end
 end
 
--- ======================
--- SI SE DESACTIVA
--- ======================
 if not _G.MurderESP then
-	if _G.MurderESPConnection then
-		_G.MurderESPConnection:Disconnect()
-		_G.MurderESPConnection = nil
+	for _, plr in ipairs(Players:GetPlayers()) do
+		clearESP(plr)
 	end
-	ClearESP()
-	warn("❌ ESP MURDER DESACTIVADO")
+	warn("❌ ESP DESACTIVADO")
 	return
 end
 
-warn("✅ ESP MURDER ACTIVADO")
+warn("✅ ESP ACTIVADO")
 
 -- ======================
--- FUNCIONES
+-- CREAR ESP
 -- ======================
-local function isMurder(player)
-	local function check(container)
-		if not container then return false end
-		for _, t in ipairs(container:GetChildren()) do
-			if t:IsA("Tool") and t.Name == "Knife" then
-				return true
-			end
-		end
-	end
-	return check(player.Character) or check(player:FindFirstChild("Backpack"))
-end
-
 local function applyESP(player)
+	if not _G.MurderESP then return end
 	if not player.Character then return end
 	if player.Character:FindFirstChild("MurderESP") then return end
 
@@ -83,27 +64,88 @@ local function applyESP(player)
 	txt.BackgroundTransparency = 1
 	txt.Text = "MURDER"
 	txt.TextColor3 = Color3.fromRGB(255,0,0)
+	txt.TextStrokeColor3 = Color3.fromRGB(0,0,0) -- borde negro
+	txt.TextStrokeTransparency = 0
 	txt.TextScaled = true
 	txt.Font = Enum.Font.SourceSansBold
 	txt.Parent = gui
 end
 
 -- ======================
--- LOOP ÚNICO Y CONTROLADO
+-- VERIFICAR KNIFE
 -- ======================
-_G.MurderESPConnection = RunService.RenderStepped:Connect(function()
-	if not _G.MurderESP then return end
+local function hasKnife(player)
 
-	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr ~= LocalPlayer and plr.Character then
-			if isMurder(plr) then
-				applyESP(plr)
-			else
-				local h = plr.Character:FindFirstChild("MurderESP")
-				if h then h:Destroy() end
-				local g = plr.Character:FindFirstChild("MurderLabel")
-				if g then g:Destroy() end
+	local function check(container)
+		if not container then return false end
+		for _, item in ipairs(container:GetChildren()) do
+			if item:IsA("Tool") and item.Name == "Knife" then
+				return true
 			end
 		end
+		return false
 	end
-end)
+
+	return check(player.Character) or check(player:FindFirstChild("Backpack"))
+end
+
+-- ======================
+-- ACTUALIZAR ESTADO
+-- ======================
+local function updatePlayer(player)
+	if not _G.MurderESP then return end
+	if player == LocalPlayer then return end
+	if not player.Character then return end
+
+	if hasKnife(player) then
+		applyESP(player)
+	else
+		clearESP(player)
+	end
+end
+
+-- ======================
+-- MONITOREAR JUGADOR
+-- ======================
+local function monitorPlayer(player)
+	if player == LocalPlayer then return end
+
+	local function connectContainer(container)
+		if not container then return end
+
+		container.ChildAdded:Connect(function()
+			updatePlayer(player)
+		end)
+
+		container.ChildRemoved:Connect(function()
+			updatePlayer(player)
+		end)
+	end
+
+	-- Backpack
+	connectContainer(player:WaitForChild("Backpack"))
+
+	-- Character
+	if player.Character then
+		connectContainer(player.Character)
+		updatePlayer(player)
+	end
+
+	player.CharacterAdded:Connect(function(char)
+		connectContainer(char)
+		task.wait(0.2)
+		updatePlayer(player)
+	end)
+
+	-- Check inicial
+	updatePlayer(player)
+end
+
+-- ======================
+-- APLICAR A TODOS
+-- ======================
+for _, plr in ipairs(Players:GetPlayers()) do
+	monitorPlayer(plr)
+end
+
+Players.PlayerAdded:Connect(monitorPlayer)

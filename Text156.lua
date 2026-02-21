@@ -29,11 +29,11 @@ if not _G.MurderESP then
 	for _, plr in ipairs(Players:GetPlayers()) do
 		clearESP(plr)
 	end
-	warn("❌ ESP MURDER DESACTIVADO")
+	warn("❌ ESP MURDERER DESACTIVADO")
 	return
 end
 
-warn("✅ ESP MURDER ACTIVADO")
+warn("✅ ESP MURDERER ACTIVADO")
 
 -- ======================
 -- CREAR ESP

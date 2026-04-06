@@ -1,151 +1,84 @@
--- ======================
--- ESP SOLO MURDER (OPTIMIZADO Y CORREGIDO)
--- ======================
+-- =========================
+-- MINI FLING FULL con GETGENV
+-- =========================
 
-if not game:IsLoaded() then game.Loaded:Wait() end
+-- Poner aquí el nombre del jugador (parcial o con errores)
+-- getgenv().TargetPlayerName = "seb"cambia wl nombre o copia para hacer fling
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- ======================
--- TOGGLE GLOBAL
--- ======================
-_G.MurderESP = not _G.MurderESP
-
--- ======================
--- LIMPIAR ESP
--- ======================
-local function clearESP(player)
-	if player.Character then
-		local h = player.Character:FindFirstChild("MurderESP")
-		if h then h:Destroy() end
-
-		local g = player.Character:FindFirstChild("MurderLabel")
-		if g then g:Destroy() end
-	end
+-- Buscar jugador por Name o DisplayName parcialmente
+local function findPlayer(name)
+    name = name:lower()
+    for _, player in pairs(Players:GetPlayers()) do
+        if string.find(player.Name:lower(), name) or string.find(player.DisplayName:lower(), name) then
+            return player
+        end
+    end
+    return nil
 end
 
-if not _G.MurderESP then
-	for _, plr in ipairs(Players:GetPlayers()) do
-		clearESP(plr)
-	end
-	warn("❌ ESP MURDERER DESACTIVADO")
-	return
+-- Función de fling
+local function miniFling(playerToFling)
+    if not playerToFling or not playerToFling.Character then
+        warn("Jugador no válido o muerto")
+        return
+    end
+
+    local character = LocalPlayer.Character
+    if not character then return end
+
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local targetCharacter = playerToFling.Character
+    local targetHRP = targetCharacter:FindFirstChild("HumanoidRootPart")
+
+    if not hrp or not humanoid or not targetHRP then return end
+
+    -- Guardar posición original
+    getgenv().OldPos = hrp.CFrame
+
+    -- Crear BodyVelocity
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Velocity = Vector3.new(1e8, 1e8, 1e8)
+    bv.Parent = hrp
+
+    -- Cambiar cámara para seguir al objetivo
+    workspace.CurrentCamera.CameraSubject = targetHRP
+
+    -- Loop: mueve alrededor hasta que salga disparado
+    repeat
+        -- posiciones locas alrededor del jugador
+        hrp.CFrame = targetHRP.CFrame + Vector3.new(0,3,0)
+        task.wait(0.03)
+        hrp.CFrame = targetHRP.CFrame + Vector3.new(0,-3,0)
+        task.wait(0.03)
+        hrp.CFrame = targetHRP.CFrame + Vector3.new(3,0,3)
+        task.wait(0.03)
+        hrp.CFrame = targetHRP.CFrame + Vector3.new(-3,0,-3)
+        task.wait(0.03)
+    until targetHRP.Velocity.Magnitude > 500 or not targetHRP.Parent or humanoid.Health <= 0
+
+    -- Destruir BodyVelocity y devolver a la posición original
+    bv:Destroy()
+    hrp.CFrame = getgenv().OldPos
+    workspace.CurrentCamera.CameraSubject = humanoid
+
+    -- Reiniciar velocidades
+    for _, part in pairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            part.Velocity = Vector3.new()
+            part.RotVelocity = Vector3.new()
+        end
+    end
 end
 
-warn("✅ ESP MURDERER ACTIVADO")
-
--- ======================
--- CREAR ESP
--- ======================
-local function applyESP(player)
-	if not _G.MurderESP then return end
-	if not player.Character then return end
-	if player.Character:FindFirstChild("MurderESP") then return end
-
-	local hl = Instance.new("Highlight")
-	hl.Name = "MurderESP"
-	hl.Adornee = player.Character
-	hl.FillColor = Color3.fromRGB(255,0,0)
-	hl.OutlineColor = Color3.fromRGB(255,0,0)
-	hl.FillTransparency = 0.5
-	hl.Parent = player.Character
-
-	local gui = Instance.new("BillboardGui")
-	gui.Name = "MurderLabel"
-	gui.Adornee = player.Character:FindFirstChild("Head")
-	gui.Size = UDim2.new(0,100,0,40)
-	gui.StudsOffset = Vector3.new(0,2,0)
-	gui.AlwaysOnTop = true
-	gui.Parent = player.Character
-
-	local txt = Instance.new("TextLabel")
-	txt.Size = UDim2.new(1,0,1,0)
-	txt.BackgroundTransparency = 1
-	txt.Text = "MURDER"
-	txt.TextColor3 = Color3.fromRGB(255,0,0)
-	txt.TextStrokeColor3 = Color3.fromRGB(0,0,0) -- borde negro
-	txt.TextStrokeTransparency = 0
-	txt.TextScaled = true
-	txt.Font = Enum.Font.SourceSansBold
-	txt.Parent = gui
+-- Ejecutar
+local target = findPlayer(getgenv().TargetPlayerName)
+if target then
+    miniFling(target)
+else
+    warn("No se encontró ningún jugador con ese nombre")
 end
-
--- ======================
--- VERIFICAR KNIFE
--- ======================
-local function hasKnife(player)
-
-	local function check(container)
-		if not container then return false end
-		for _, item in ipairs(container:GetChildren()) do
-			if item:IsA("Tool") and item.Name == "Knife" then
-				return true
-			end
-		end
-		return false
-	end
-
-	return check(player.Character) or check(player:FindFirstChild("Backpack"))
-end
-
--- ======================
--- ACTUALIZAR ESTADO
--- ======================
-local function updatePlayer(player)
-	if not _G.MurderESP then return end
-	if player == LocalPlayer then return end
-	if not player.Character then return end
-
-	if hasKnife(player) then
-		applyESP(player)
-	else
-		clearESP(player)
-	end
-end
-
--- ======================
--- MONITOREAR JUGADOR
--- ======================
-local function monitorPlayer(player)
-	if player == LocalPlayer then return end
-
-	local function connectContainer(container)
-		if not container then return end
-
-		container.ChildAdded:Connect(function()
-			updatePlayer(player)
-		end)
-
-		container.ChildRemoved:Connect(function()
-			updatePlayer(player)
-		end)
-	end
-
-	-- Backpack
-	connectContainer(player:WaitForChild("Backpack"))
-
-	-- Character
-	if player.Character then
-		connectContainer(player.Character)
-		updatePlayer(player)
-	end
-
-	player.CharacterAdded:Connect(function(char)
-		connectContainer(char)
-		task.wait(0.2)
-		updatePlayer(player)
-	end)
-
-	-- Check inicial
-	updatePlayer(player)
-end
-
--- ======================
--- APLICAR A TODOS
--- ======================
-for _, plr in ipairs(Players:GetPlayers()) do
-	monitorPlayer(plr)
-end
-
-Players.PlayerAdded:Connect(monitorPlayer)
